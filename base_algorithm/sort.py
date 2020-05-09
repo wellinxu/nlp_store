@@ -87,43 +87,18 @@ class ShellSort(BaseSort):
     def __init__(self, arg_list, **kwargs):
         super(ShellSort, self).__init__(arg_list, **kwargs)
 
-    def sort2(self):
-        n = self.length // 2
-        k_list = [n]
-        while n > 1:
-            n = n // 2
-            k_list.append(n)
-        for k in k_list:
-            for i in range(k, self.length):
-                j_list = [j for j in reversed(range(i, -1, -k))][:-1]
-                for j_index, j in enumerate(j_list):
-                    if self.arg_list[i] < self.arg_list[j]:
-                        for jj in reversed(j_list[j_index:]):
-                            self.step += 1
-                            self.swap(jj, i)
-                            i = jj
-                        break
     def sort(self):
-        n = self.length // 2
-        k_list = [n]
-        while n > 1:
-            n = n // 2
-            k_list.append(n)
-        for k in k_list:
-            arg_list = self.copy_list(self.arg_list)
-            for ki in range(k):
-                indexs = [i for i in range(ki, self.length, k)]
-                copy_indexs = indexs.copy()
-                for i in range(1, len(indexs)):
-                    i_index = indexs[i]
-                    for j in range(i):
-                        j_index = indexs[j]
-                        if self.arg_list[i_index] < self.arg_list[j_index]:
-                            indexs.insert(j, indexs.pop(i))
-                            break
-                for i, j in zip(indexs, copy_indexs):
-                    self.arg_list[j] = arg_list[i]
-
+        k = self.length
+        while k > 1:
+            k = k // 2
+            for i in range(k, self.length):
+                tem = self.arg_list[i]
+                for j in range(i-k, -1, -k):
+                    if self.arg_list[i] < self.arg_list[j]:
+                        self.swap(j, i)
+                        i = j
+                    else:
+                        break
 
 
 
@@ -264,38 +239,47 @@ class HeapSort(BaseSort):
         super(HeapSort, self).__init__(arg_list, **kwargs)
 
     def sort(self):
+        n = self.length // 2
+        for i in reversed(range(n)):
+            self.heap(self.length, i)
         for i in range(self.length):
-            self.heap(self.length - i)
-            self.arg_list.append(self.arg_list.pop(0))
+            #self.arg_list.append(self.arg_list.pop(0))
+            self.swap(self.length - i - 1, 0)
+            self.heap(self.length - i - 1, 0)
 
-    def heap(self, length):
+    def heap(self, length, i):
         if length < 2:
             return
-        n = length // 2
-        for i in reversed(range(n)):
-            left = i * 2 + 1
-            right = i * 2 + 2
-            if right < length and self.arg_list[right] < self.arg_list[i]:
-                self.step += 1
-                self.swap(right, i)
-            if left < length and self.arg_list[left] < self.arg_list[i]:
-                self.step += 1
-                self.swap(left, i)
+        left = i * 2 + 1
+        right = i * 2 + 2
+        t = i
+            
+        if left < length and self.arg_list[left] < self.arg_list[i]:
+            self.step += 1
+                #self.swap(left, i)
+            i = left
+        if right < length and self.arg_list[right] < self.arg_list[i]:
+            self.step += 1
+            i = right
+                #self.swap(right, i)
+        if t != i:
+            self.swap(t, i)
+            self.heap(length, i)
+            
 
 
 if __name__ == '__main__':
     import random
-    arg_list = [i for i in range(500)]
+    arg_list = [i for i in range(1000)]
     random.shuffle(arg_list)
     # print(arg_list)
-    sort = BubbleSort(arg_list.copy())
-    sort.print()
-    sort = SelectSort(arg_list.copy())
-    sort.print()
+    #sort = BubbleSort(arg_list.copy())
+    #sort.print()
+    #sort = SelectSort(arg_list.copy())
+    #sort.print()
     sort = InsertSort(arg_list.copy())
     sort.print()
     sort = ShellSort(arg_list.copy())
-    # print(sort.arg_list)
     sort.print()
     sort = MergeSort(arg_list.copy())
     sort.print()
@@ -303,5 +287,5 @@ if __name__ == '__main__':
     sort.print()
     sort = HeapSort(arg_list.copy())
     sort.print()
-    # print(sort.arg_list)
+    #print(sort.arg_list)
     # print(sort.time)

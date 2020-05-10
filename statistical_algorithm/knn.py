@@ -60,11 +60,6 @@ class KNN(object):
         return 1
 
 
-
-
-
-
-
 class Node(object):
     def __init__(self, sample, deepth, value):
         self.sample = sample

@@ -1,3 +1,7 @@
+"""
+源码阅读，结合https://note.youdao.com/ynoteshare1/index.html?id=b81b64e5f174ac03cc2bc37b5a72484d&type=note
+查看，效果更好
+"""
 # coding=utf-8
 # Copyright 2018 The Google AI Language Team Authors.
 #
@@ -29,7 +33,7 @@ import tensorflow as tf
 
 
 class BertConfig(object):
-  """Configuration for `BertModel`."""
+  """BERT模型的配置参数"""
 
   def __init__(self,
                vocab_size,
@@ -43,29 +47,20 @@ class BertConfig(object):
                max_position_embeddings=512,
                type_vocab_size=16,
                initializer_range=0.02):
-    """Constructs BertConfig.
+    """
 
     Args:
-      vocab_size: Vocabulary size of `inputs_ids` in `BertModel`.
-      hidden_size: Size of the encoder layers and the pooler layer.
-      num_hidden_layers: Number of hidden layers in the Transformer encoder.
-      num_attention_heads: Number of attention heads for each attention layer in
-        the Transformer encoder.
-      intermediate_size: The size of the "intermediate" (i.e., feed-forward)
-        layer in the Transformer encoder.
-      hidden_act: The non-linear activation function (function or string) in the
-        encoder and pooler.
-      hidden_dropout_prob: The dropout probability for all fully connected
-        layers in the embeddings, encoder, and pooler.
-      attention_probs_dropout_prob: The dropout ratio for the attention
-        probabilities.
-      max_position_embeddings: The maximum sequence length that this model might
-        ever be used with. Typically set this to something large just in case
-        (e.g., 512 or 1024 or 2048).
-      type_vocab_size: The vocabulary size of the `token_type_ids` passed into
-        `BertModel`.
-      initializer_range: The stdev of the truncated_normal_initializer for
-        initializing all weight matrices.
+      vocab_size: int，bert词表大小.
+      hidden_size: int，encoder层与poller层输出维度,以及词向量维度.
+      num_hidden_layers: int，Transformer中隐藏层的大小.
+      num_attention_heads: int，Transformer中attention的头数.
+      intermediate_size: int，每层中间前向传播时的维度
+      hidden_act:sring， 非线性激活函数名称. 每层中间前向传播时使用，原注释说pooler层也使用，但代码里poller层固定使用的tanh激活函数
+      hidden_dropout_prob: float， embeddings, encoder和pooler层的丢弃概率.
+      attention_probs_dropout_prob:float， attention得分概率丢弃的比例
+      max_position_embeddings: int，序列允许的最大长度
+      type_vocab_size: int， token类型数量
+      initializer_range: float,初始化参数的方差范围
     """
     self.vocab_size = vocab_size
     self.hidden_size = hidden_size
@@ -107,10 +102,9 @@ class BertConfig(object):
 class BertModel(object):
   """BERT model ("Bidirectional Encoder Representations from Transformers").
 
-  Example usage:
+  示例:
 
   ```python
-  # Already been converted into WordPiece token ids
   input_ids = tf.constant([[31, 51, 99], [15, 5, 0]])
   input_mask = tf.constant([[1, 1, 1], [1, 1, 0]])
   token_type_ids = tf.constant([[0, 0, 1], [0, 2, 0]])
@@ -136,41 +130,39 @@ class BertModel(object):
                token_type_ids=None,
                use_one_hot_embeddings=False,
                scope=None):
-    """Constructor for BertModel.
+    """BERT模型的构造
 
     Args:
       config: `BertConfig` instance.
-      is_training: bool. true for training model, false for eval model. Controls
-        whether dropout will be applied.
-      input_ids: int32 Tensor of shape [batch_size, seq_length].
-      input_mask: (optional) int32 Tensor of shape [batch_size, seq_length].
-      token_type_ids: (optional) int32 Tensor of shape [batch_size, seq_length].
-      use_one_hot_embeddings: (optional) bool. Whether to use one-hot word
-        embeddings or tf.embedding_lookup() for the word embeddings.
-      scope: (optional) variable scope. Defaults to "bert".
+      is_training: bool. 是不是train模式，控制是否使用dropout
+      input_ids: int32张量，形状为[batch_size, seq_length].
+      input_mask: (可选) int32张量，形状为[batch_size, seq_length]
+      token_type_ids: (可选) int32张量，形状为[batch_size, seq_length],类型ids，bert里面0表示第一句，1表示第二句
+      use_one_hot_embeddings: (可选) bool. 获取词向量时，使用one-hot方式还是tf.gather()方式
+      scope: (可选) 变量范围，默认"bert".
 
     Raises:
-      ValueError: The config is invalid or one of the input tensor shapes
-        is invalid.
+      ValueError: 配置无效或者某个输入张量维度无效
     """
     config = copy.deepcopy(config)
-    if not is_training:
+    if not is_training:    # 非训练模式时，不进行dropout
       config.hidden_dropout_prob = 0.0
       config.attention_probs_dropout_prob = 0.0
 
+    # 获取输入形状，batch_size大小与seq_length大小
     input_shape = get_shape_list(input_ids, expected_rank=2)
     batch_size = input_shape[0]
     seq_length = input_shape[1]
 
+    # input_mask或token_type_ids为空时，生成默认结果
     if input_mask is None:
       input_mask = tf.ones(shape=[batch_size, seq_length], dtype=tf.int32)
-
     if token_type_ids is None:
       token_type_ids = tf.zeros(shape=[batch_size, seq_length], dtype=tf.int32)
 
     with tf.variable_scope(scope, default_name="bert"):
       with tf.variable_scope("embeddings"):
-        # Perform embedding lookup on the word ids.
+        # 获取词向量
         (self.embedding_output, self.embedding_table) = embedding_lookup(
             input_ids=input_ids,
             vocab_size=config.vocab_size,
@@ -179,8 +171,7 @@ class BertModel(object):
             word_embedding_name="word_embeddings",
             use_one_hot_embeddings=use_one_hot_embeddings)
 
-        # Add positional embeddings and token type embeddings, then layer
-        # normalize and perform dropout.
+        # 加上位置向量与token类型向量，然后进行层标准化与dropout
         self.embedding_output = embedding_postprocessor(
             input_tensor=self.embedding_output,
             use_token_type=True,
@@ -194,14 +185,12 @@ class BertModel(object):
             dropout_prob=config.hidden_dropout_prob)
 
       with tf.variable_scope("encoder"):
-        # This converts a 2D mask of shape [batch_size, seq_length] to a 3D
-        # mask of shape [batch_size, seq_length, seq_length] which is used
-        # for the attention scores.
+        # 将维度位[batch_size, seq_length]的2维mask张量转化成维度为[batch_size, seq_length, seq_length]的3维mask张量
+        # 在计算attention得分时使用
         attention_mask = create_attention_mask_from_input_mask(
             input_ids, input_mask)
 
-        # Run the stacked transformer.
-        # `sequence_output` shape = [batch_size, seq_length, hidden_size].
+        # 构建叠层transformer.
         self.all_encoder_layers = transformer_model(
             input_tensor=self.embedding_output,
             attention_mask=attention_mask,
@@ -215,16 +204,13 @@ class BertModel(object):
             initializer_range=config.initializer_range,
             do_return_all_layers=True)
 
-      self.sequence_output = self.all_encoder_layers[-1]
-      # The "pooler" converts the encoded sequence tensor of shape
-      # [batch_size, seq_length, hidden_size] to a tensor of shape
-      # [batch_size, hidden_size]. This is necessary for segment-level
-      # (or segment-pair-level) classification tasks where we need a fixed
-      # dimensional representation of the segment.
+      self.sequence_output = self.all_encoder_layers[-1]    #  [batch_size, seq_length, hidden_size]
+      # pooler层将序列编码张量的形状[batch_size, seq_length, hidden_size]转换为[batch_size, hidden_size]
+      # 这对句子级别或者句子对级别的分类很有作用，因为那时候需要一个固定维度的向量来表示句子
       with tf.variable_scope("pooler"):
-        # We "pool" the model by simply taking the hidden state corresponding
-        # to the first token. We assume that this has been pre-trained
+        # 简单使用第一个token的隐藏状态来计算
         first_token_tensor = tf.squeeze(self.sequence_output[:, 0:1, :], axis=1)
+        # pooled_output:[batch_size, hidden_size]
         self.pooled_output = tf.layers.dense(
             first_token_tensor,
             config.hidden_size,
@@ -232,45 +218,39 @@ class BertModel(object):
             kernel_initializer=create_initializer(config.initializer_range))
 
   def get_pooled_output(self):
+    # 获取pooler层结果
     return self.pooled_output
 
   def get_sequence_output(self):
-    """Gets final hidden layer of encoder.
+    """获取最后一层encoder结果.
 
     Returns:
-      float Tensor of shape [batch_size, seq_length, hidden_size] corresponding
-      to the final hidden of the transformer encoder.
+      float张量，形状为[batch_size, seq_length, hidden_size]
     """
     return self.sequence_output
 
   def get_all_encoder_layers(self):
+    # 获取所有encoder层结果
     return self.all_encoder_layers
 
   def get_embedding_output(self):
-    """Gets output of the embedding lookup (i.e., input to the transformer).
+    """获取embedding层结果
 
     Returns:
-      float Tensor of shape [batch_size, seq_length, hidden_size] corresponding
-      to the output of the embedding layer, after summing the word
-      embeddings with the positional embeddings and the token type embeddings,
-      then performing layer normalization. This is the input to the transformer.
+      float张量，形状为[batch_size, seq_length, hidden_size] 词向量、位置向量、token类型向量求和后，
+      再进行层标准化与dropout的结果。是encoder层的输入
     """
     return self.embedding_output
 
   def get_embedding_table(self):
+    # 获取词向量词表
     return self.embedding_table
 
 
 def gelu(x):
-  """Gaussian Error Linear Unit.
-
-  This is a smoother version of the RELU.
-  Original paper: https://arxiv.org/abs/1606.08415
-  Args:
-    x: float Tensor to perform activation.
-
-  Returns:
-    `x` with the GELU activation applied.
+  """
+  高斯误差线性单元
+  原论文: https://arxiv.org/abs/1606.08415
   """
   cdf = 0.5 * (1.0 + tf.tanh(
       (np.sqrt(2 / np.pi) * (x + 0.044715 * tf.pow(x, 3)))))
@@ -278,23 +258,7 @@ def gelu(x):
 
 
 def get_activation(activation_string):
-  """Maps a string to a Python function, e.g., "relu" => `tf.nn.relu`.
-
-  Args:
-    activation_string: String name of the activation function.
-
-  Returns:
-    A Python function corresponding to the activation function. If
-    `activation_string` is None, empty, or "linear", this will return None.
-    If `activation_string` is not a string, it will return `activation_string`.
-
-  Raises:
-    ValueError: The `activation_string` does not correspond to a known
-      activation.
-  """
-
-  # We assume that anything that"s not a string is already an activation
-  # function, so we just return it.
+  """根据激活函数名称获取激活函数"""
   if not isinstance(activation_string, six.string_types):
     return activation_string
 
@@ -315,7 +279,7 @@ def get_activation(activation_string):
 
 
 def get_assignment_map_from_checkpoint(tvars, init_checkpoint):
-  """Compute the union of the current variables and checkpoint variables."""
+  """本文件中没有被使用Compute the union of the current variables and checkpoint variables."""
   assignment_map = {}
   initialized_variable_names = {}
 
@@ -342,15 +306,12 @@ def get_assignment_map_from_checkpoint(tvars, init_checkpoint):
 
 
 def dropout(input_tensor, dropout_prob):
-  """Perform dropout.
-
+  """执行dropout.
   Args:
-    input_tensor: float Tensor.
-    dropout_prob: Python float. The probability of dropping out a value (NOT of
-      *keeping* a dimension as in `tf.nn.dropout`).
-
+    input_tensor: float张量
+    dropout_prob: float. 丢弃的概率
   Returns:
-    A version of `input_tensor` with dropout applied.
+    执行过dropout后的张量
   """
   if dropout_prob is None or dropout_prob == 0.0:
     return input_tensor
@@ -360,20 +321,20 @@ def dropout(input_tensor, dropout_prob):
 
 
 def layer_norm(input_tensor, name=None):
-  """Run layer normalization on the last dimension of the tensor."""
+  """对张量的最后一维进行层标准化"""
   return tf.contrib.layers.layer_norm(
       inputs=input_tensor, begin_norm_axis=-1, begin_params_axis=-1, scope=name)
 
 
 def layer_norm_and_dropout(input_tensor, dropout_prob, name=None):
-  """Runs layer normalization followed by dropout."""
+  """进行层标准化再进行dropout"""
   output_tensor = layer_norm(input_tensor, name)
   output_tensor = dropout(output_tensor, dropout_prob)
   return output_tensor
 
 
 def create_initializer(initializer_range=0.02):
-  """Creates a `truncated_normal_initializer` with the given range."""
+  """根据给定范围创建截尾正态分布初始器"""
   return tf.truncated_normal_initializer(stddev=initializer_range)
 
 
@@ -398,6 +359,7 @@ def embedding_lookup(input_ids,
   """
   # 假设输入维度为[batch_size, seq_length,num_inputs].
   # 如果输入维度是[batch_size, seq_length], 则改为[batch_size, seq_length, 1].
+  # 如果只是bert模型使用，这一步其实没有必要的
   if input_ids.shape.ndims == 2:
     input_ids = tf.expand_dims(input_ids, axis=[-1])
 
@@ -408,15 +370,16 @@ def embedding_lookup(input_ids,
 
   flat_input_ids = tf.reshape(input_ids, [-1])
   if use_one_hot_embeddings:
-    # 使用one-hot的方法获取词向量，one-hot乘词表
+    # 使用one-hot的方法获取词向量，one-hot乘词表,词表较小时，这种方式更快
     one_hot_input_ids = tf.one_hot(flat_input_ids, depth=vocab_size)
     output = tf.matmul(one_hot_input_ids, embedding_table)
   else:
     # 使用tf.gather()获取词向量
     output = tf.gather(embedding_table, flat_input_ids)
 
-  input_shape = get_shape_list(input_ids)
+  input_shape = get_shape_list(input_ids)    # [batch_size, seq_length, 1].
 
+  #[batch_size, seq_length, embedding_size].
   output = tf.reshape(output,
                       input_shape[0:-1] + [input_shape[-1] * embedding_size])
   return (output, embedding_table)
@@ -432,122 +395,106 @@ def embedding_postprocessor(input_tensor,
                             initializer_range=0.02,
                             max_position_embeddings=512,
                             dropout_prob=0.1):
-  """Performs various post-processing on a word embedding tensor.
+  """对词向量进行后处理
 
   Args:
-    input_tensor: float Tensor of shape [batch_size, seq_length,
-      embedding_size].
-    use_token_type: bool. Whether to add embeddings for `token_type_ids`.
-    token_type_ids: (optional) int32 Tensor of shape [batch_size, seq_length].
-      Must be specified if `use_token_type` is True.
-    token_type_vocab_size: int. The vocabulary size of `token_type_ids`.
-    token_type_embedding_name: string. The name of the embedding table variable
-      for token type ids.
-    use_position_embeddings: bool. Whether to add position embeddings for the
-      position of each token in the sequence.
-    position_embedding_name: string. The name of the embedding table variable
-      for positional embeddings.
-    initializer_range: float. Range of the weight initialization.
-    max_position_embeddings: int. Maximum sequence length that might ever be
-      used with this model. This can be longer than the sequence length of
-      input_tensor, but cannot be shorter.
-    dropout_prob: float. Dropout probability applied to the final output tensor.
+    input_tensor: float张量，形状为[batch_size, seq_length,embedding_size]，词向量
+    use_token_type: bool. 是否添加token的类型向量
+    token_type_ids: (可选) int32张量，形状为[batch_size, seq_length]，use_token_type为True时必要有
+    token_type_vocab_size: int. token类型的数量
+    token_type_embedding_name: string. token的类型向量表的名字
+    use_position_embeddings: bool. 是否添加位置向量
+    position_embedding_name: string. 位置向量表的名字
+    initializer_range: float. 初始化的范围参数
+    max_position_embeddings: int. 位置向量的最大长度，只能比输入序列更长
+    dropout_prob: float. 最后输出的丢弃概率
 
   Returns:
-    float tensor with same shape as `input_tensor`.
+    跟输入维度一致的float张量
 
   Raises:
-    ValueError: One of the tensor shapes or input values is invalid.
+    ValueError: 张量形状或者输入值无效
   """
+  # 获取输入张量维度，batch_size,seq_length,width(词向量的维度)
   input_shape = get_shape_list(input_tensor, expected_rank=3)
   batch_size = input_shape[0]
   seq_length = input_shape[1]
   width = input_shape[2]
 
-  output = input_tensor
+  output = input_tensor    # 初始化输出张量
 
   if use_token_type:
+    # 加上token类型向量
     if token_type_ids is None:
       raise ValueError("`token_type_ids` must be specified if"
                        "`use_token_type` is True.")
+    # token类型向量表变量
     token_type_table = tf.get_variable(
         name=token_type_embedding_name,
         shape=[token_type_vocab_size, width],
         initializer=create_initializer(initializer_range))
-    # This vocab will be small so we always do one-hot here, since it is always
-    # faster for a small vocabulary.
+    # 因为类型词表总是很小，所以直接使用one-hot的方式获取向量，因为这种方式在小词表时总是更快
     flat_token_type_ids = tf.reshape(token_type_ids, [-1])
     one_hot_ids = tf.one_hot(flat_token_type_ids, depth=token_type_vocab_size)
     token_type_embeddings = tf.matmul(one_hot_ids, token_type_table)
     token_type_embeddings = tf.reshape(token_type_embeddings,
                                        [batch_size, seq_length, width])
-    output += token_type_embeddings
+    output += token_type_embeddings    # 直接将token类型向量加到输出上
 
   if use_position_embeddings:
+    # 加上位置向量
     assert_op = tf.assert_less_equal(seq_length, max_position_embeddings)
     with tf.control_dependencies([assert_op]):
+      # 位置向量表变量
       full_position_embeddings = tf.get_variable(
           name=position_embedding_name,
           shape=[max_position_embeddings, width],
           initializer=create_initializer(initializer_range))
-      # Since the position embedding table is a learned variable, we create it
-      # using a (long) sequence length `max_position_embeddings`. The actual
-      # sequence length might be shorter than this, for faster training of
-      # tasks that do not have long sequences.
-      #
-      # So `full_position_embeddings` is effectively an embedding table
-      # for position [0, 1, 2, ..., max_position_embeddings-1], and the current
-      # sequence has positions [0, 1, 2, ... seq_length-1], so we can just
-      # perform a slice.
+      # full_position_embeddings已经建立了0到max_position_embeddings-1位置上的向量，
+      # 为了获取0到seq_length-1位置上的向量，只要使用slice操作即可
       position_embeddings = tf.slice(full_position_embeddings, [0, 0],
                                      [seq_length, -1])
       num_dims = len(output.shape.as_list())
 
-      # Only the last two dimensions are relevant (`seq_length` and `width`), so
-      # we broadcast among the first dimensions, which is typically just
-      # the batch size.
+      # 只有最后两维是相关的(`seq_length` and `width`), 所以只要广播开始的维度，通常是batch_size的维度
       position_broadcast_shape = []
       for _ in range(num_dims - 2):
         position_broadcast_shape.append(1)
-      position_broadcast_shape.extend([seq_length, width])
-      position_embeddings = tf.reshape(position_embeddings,
-                                       position_broadcast_shape)
-      output += position_embeddings
+      position_broadcast_shape.extend([seq_length, width])    # position_broadcast_shape=[1, seq_length, width]
+      position_embeddings = tf.reshape(position_embeddings,position_broadcast_shape)    # [1, seq_length, width]
+      output += position_embeddings    # 直接将位置向量加到输出上
 
+  # 先进行层标准化再dropout
   output = layer_norm_and_dropout(output, dropout_prob)
   return output
 
 
 def create_attention_mask_from_input_mask(from_tensor, to_mask):
-  """Create 3D attention mask from a 2D tensor mask.
+  """将维度位[batch_size, seq_length]的2维mask张量转化成维度为[batch_size, seq_length, seq_length]的3维mask张量
 
   Args:
-    from_tensor: 2D or 3D Tensor of shape [batch_size, from_seq_length, ...].
-    to_mask: int32 Tensor of shape [batch_size, to_seq_length].
+    from_tensor: 形状为[batch_size, from_seq_length, ...]的张量
+    to_mask: int32张量，形状为[batch_size, to_seq_length].
 
   Returns:
-    float Tensor of shape [batch_size, from_seq_length, to_seq_length].
+    float张量，形状为[batch_size, from_seq_length, to_seq_length].
   """
+  # 获取from_shape维度，输入的秩职能是2或3，得到batch_size,from_seq_length
   from_shape = get_shape_list(from_tensor, expected_rank=[2, 3])
   batch_size = from_shape[0]
   from_seq_length = from_shape[1]
 
+  # 获取to_mask维度，输入的秩职能是2或3，得到to_seq_length
   to_shape = get_shape_list(to_mask, expected_rank=2)
   to_seq_length = to_shape[1]
 
-  to_mask = tf.cast(
-      tf.reshape(to_mask, [batch_size, 1, to_seq_length]), tf.float32)
+  # 将to_mask转为float32型，并reshape为[batch_size, 1, to_seq_length]
+  to_mask = tf.cast(tf.reshape(to_mask, [batch_size, 1, to_seq_length]), tf.float32)
 
-  # We don't assume that `from_tensor` is a mask (although it could be). We
-  # don't actually care if we attend *from* padding tokens (only *to* padding)
-  # tokens so we create a tensor of all ones.
-  #
-  # `broadcast_ones` = [batch_size, from_seq_length, 1]
-  broadcast_ones = tf.ones(
-      shape=[batch_size, from_seq_length, 1], dtype=tf.float32)
+  # 创建形状为[batch_size, from_seq_length, 1]的全1张量
+  broadcast_ones = tf.ones(shape=[batch_size, from_seq_length, 1], dtype=tf.float32)
 
-  # Here we broadcast along two dimensions to create the mask.
-  mask = broadcast_ones * to_mask
+  mask = broadcast_ones * to_mask    # [batch_size, from_seq_length, to_seq_length]
 
   return mask
 
@@ -566,7 +513,7 @@ def attention_layer(from_tensor,
                     batch_size=None,
                     from_seq_length=None,
                     to_seq_length=None):
-  """Performs multi-headed attention from `from_tensor` to `to_tensor`.
+  """根据from_tensor与to_tensor执行多头attention
 
   This is an implementation of multi-headed attention based on "Attention
   is all you Need". If `from_tensor` and `to_tensor` are the same, then
@@ -583,46 +530,36 @@ def attention_layer(from_tensor,
   interpolated by these probabilities, then concatenated back to a single
   tensor and returned.
 
-  In practice, the multi-headed attention are done with transposes and
-  reshapes rather than actual separate tensors.
+  事实上，多头attention是通过转置与改变维度来处理的，而不是真的切分张量，因为这样会快得多
 
   Args:
-    from_tensor: float Tensor of shape [batch_size, from_seq_length,
-      from_width].
-    to_tensor: float Tensor of shape [batch_size, to_seq_length, to_width].
-    attention_mask: (optional) int32 Tensor of shape [batch_size,
-      from_seq_length, to_seq_length]. The values should be 1 or 0. The
-      attention scores will effectively be set to -infinity for any positions in
-      the mask that are 0, and will be unchanged for positions that are 1.
-    num_attention_heads: int. Number of attention heads.
-    size_per_head: int. Size of each attention head.
-    query_act: (optional) Activation function for the query transform.
-    key_act: (optional) Activation function for the key transform.
-    value_act: (optional) Activation function for the value transform.
-    attention_probs_dropout_prob: (optional) float. Dropout probability of the
-      attention probabilities.
-    initializer_range: float. Range of the weight initializer.
-    do_return_2d_tensor: bool. If True, the output will be of shape [batch_size
-      * from_seq_length, num_attention_heads * size_per_head]. If False, the
-      output will be of shape [batch_size, from_seq_length, num_attention_heads
+    from_tensor: float张量，维度为[batch_size, from_seq_length, from_width].
+    to_tensor: float张量，维度为[batch_size, to_seq_length, to_width].
+    attention_mask: (可选) int32张量，维度为[batch_size,from_seq_length, to_seq_length]. 值是1或0.
+    num_attention_heads: int. attention头的数量.
+    size_per_head: int. 每个attention头的维度.
+    query_act: (可选) query映射时的激活函数.
+    key_act: (可选) key 映射时的激活函数.
+    value_act: (可选) alue映射时的激活函数.
+    attention_probs_dropout_prob: (可选) float. attention概率的丢弃比例.
+    initializer_range: float. 初始化参数范围
+    do_return_2d_tensor: bool. True时，返回的形状为[batch_size
+      * from_seq_length, num_attention_heads * size_per_head]，否则返回的形状为[batch_size, from_seq_length, num_attention_heads
       * size_per_head].
-    batch_size: (Optional) int. If the input is 2D, this might be the batch size
-      of the 3D version of the `from_tensor` and `to_tensor`.
-    from_seq_length: (Optional) If the input is 2D, this might be the seq length
-      of the 3D version of the `from_tensor`.
-    to_seq_length: (Optional) If the input is 2D, this might be the seq length
-      of the 3D version of the `to_tensor`.
+    batch_size: (可选) int. 如果输入是两维的，需要提供
+    from_seq_length: (可选) int. 如果输入是两维的，需要提供
+    to_seq_length: (可选) int. 如果输入是两维的，需要提供
 
   Returns:
-    float Tensor of shape [batch_size, from_seq_length,
-      num_attention_heads * size_per_head]. (If `do_return_2d_tensor` is
-      true, this will be of shape [batch_size * from_seq_length,
+    float张量，维度为[batch_size, from_seq_length,
+      num_attention_heads * size_per_head]. (如果`do_return_2d_tensor`是
+      true, 则形状为[batch_size * from_seq_length,
       num_attention_heads * size_per_head]).
 
   Raises:
-    ValueError: Any of the arguments or tensor shapes are invalid.
+    ValueError: 参数或者张量形状无效
   """
-
+  # reshape张量后，转换第二维与第三维
   def transpose_for_scores(input_tensor, batch_size, num_attention_heads,
                            seq_length, width):
     output_tensor = tf.reshape(
@@ -638,6 +575,7 @@ def attention_layer(from_tensor,
     raise ValueError(
         "The rank of `from_tensor` must match the rank of `to_tensor`.")
 
+  # 获取batch_size， from_seq_length， to_seq_length
   if len(from_shape) == 3:
     batch_size = from_shape[0]
     from_seq_length = from_shape[1]
@@ -649,17 +587,17 @@ def attention_layer(from_tensor,
           "for `batch_size`, `from_seq_length`, and `to_seq_length` "
           "must all be specified.")
 
-  # Scalar dimensions referenced here:
-  #   B = batch size (number of sequences)
-  #   F = `from_tensor` sequence length
-  #   T = `to_tensor` sequence length
-  #   N = `num_attention_heads`
-  #   H = `size_per_head`
+  # 各个字母维度含义:
+  #   B = batch size
+  #   F = `from_tensor`的序列长度
+  #   T = `to_tensor`的序列长度
+  #   N = attention头数
+  #   H = 每个attention头数的隐藏层
 
-  from_tensor_2d = reshape_to_matrix(from_tensor)
-  to_tensor_2d = reshape_to_matrix(to_tensor)
+  from_tensor_2d = reshape_to_matrix(from_tensor)    # [B*F, embedding_size]
+  to_tensor_2d = reshape_to_matrix(to_tensor)    # [B*T, embedding_size]
 
-  # `query_layer` = [B*F, N*H]
+  # `query_layer` = [B*F, N*H],将from_tensor映射为query
   query_layer = tf.layers.dense(
       from_tensor_2d,
       num_attention_heads * size_per_head,
@@ -667,7 +605,7 @@ def attention_layer(from_tensor,
       name="query",
       kernel_initializer=create_initializer(initializer_range))
 
-  # `key_layer` = [B*T, N*H]
+  # `key_layer` = [B*T, N*H],将to_tensor映射为key
   key_layer = tf.layers.dense(
       to_tensor_2d,
       num_attention_heads * size_per_head,
@@ -675,7 +613,7 @@ def attention_layer(from_tensor,
       name="key",
       kernel_initializer=create_initializer(initializer_range))
 
-  # `value_layer` = [B*T, N*H]
+  # `value_layer` = [B*T, N*H],将to_tensor映射为value
   value_layer = tf.layers.dense(
       to_tensor_2d,
       num_attention_heads * size_per_head,
@@ -692,10 +630,11 @@ def attention_layer(from_tensor,
   key_layer = transpose_for_scores(key_layer, batch_size, num_attention_heads,
                                    to_seq_length, size_per_head)
 
-  # Take the dot product between "query" and "key" to get the raw
-  # attention scores.
+  # 将query与key进行点积，得到attention得分.
   # `attention_scores` = [B, N, F, T]
   attention_scores = tf.matmul(query_layer, key_layer, transpose_b=True)
+  # 根据维度进行缩放，将方差校正为1
+  # query_layer与key_layer都服从0均值1方差的标准正太分布，点积后服从0均值size_per_head方差的标准正太分布
   attention_scores = tf.multiply(attention_scores,
                                  1.0 / math.sqrt(float(size_per_head)))
 
@@ -703,16 +642,13 @@ def attention_layer(from_tensor,
     # `attention_mask` = [B, 1, F, T]
     attention_mask = tf.expand_dims(attention_mask, axis=[1])
 
-    # Since attention_mask is 1.0 for positions we want to attend and 0.0 for
-    # masked positions, this operation will create a tensor which is 0.0 for
-    # positions we want to attend and -10000.0 for masked positions.
+    # attention_mask为1是需要被注意到，为0是不要被注意到，创建一个张量，需要被主要到时等于0，不需要时等于-10000
     adder = (1.0 - tf.cast(attention_mask, tf.float32)) * -10000.0
 
-    # Since we are adding it to the raw scores before the softmax, this is
-    # effectively the same as removing these entirely.
+    # 在softmax之前，将adder加到attention得分中，可以高效地处理不需要关注的位置
     attention_scores += adder
 
-  # Normalize the attention scores to probabilities.
+  # 计算attention概率
   # `attention_probs` = [B, N, F, T]
   attention_probs = tf.nn.softmax(attention_scores)
 
@@ -728,14 +664,14 @@ def attention_layer(from_tensor,
   # `value_layer` = [B, N, T, H]
   value_layer = tf.transpose(value_layer, [0, 2, 1, 3])
 
-  # `context_layer` = [B, N, F, H]
-  context_layer = tf.matmul(attention_probs, value_layer)
+  # attention_probs与value点积， `context_layer` = [B, N, F, H]
+  context_layer = tf.matmul(attention_probs, value_layer)    # attention结果
 
   # `context_layer` = [B, F, N, H]
   context_layer = tf.transpose(context_layer, [0, 2, 1, 3])
 
   if do_return_2d_tensor:
-    # `context_layer` = [B*F, N*H]
+    # `context_layer` = [B*F, N*H]，返回2d模式
     context_layer = tf.reshape(
         context_layer,
         [batch_size * from_seq_length, num_attention_heads * size_per_head])
@@ -759,74 +695,64 @@ def transformer_model(input_tensor,
                       attention_probs_dropout_prob=0.1,
                       initializer_range=0.02,
                       do_return_all_layers=False):
-  """Multi-headed, multi-layer Transformer from "Attention is All You Need".
+  """根据"Attention is All You Need"的多头，多层Transformer,几乎跟原实现一样
 
-  This is almost an exact implementation of the original Transformer encoder.
-
-  See the original paper:
+  原论文:
   https://arxiv.org/abs/1706.03762
 
   Also see:
   https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/models/transformer.py
 
   Args:
-    input_tensor: float Tensor of shape [batch_size, seq_length, hidden_size].
-    attention_mask: (optional) int32 Tensor of shape [batch_size, seq_length,
-      seq_length], with 1 for positions that can be attended to and 0 in
-      positions that should not be.
-    hidden_size: int. Hidden size of the Transformer.
-    num_hidden_layers: int. Number of layers (blocks) in the Transformer.
-    num_attention_heads: int. Number of attention heads in the Transformer.
-    intermediate_size: int. The size of the "intermediate" (a.k.a., feed
-      forward) layer.
-    intermediate_act_fn: function. The non-linear activation function to apply
-      to the output of the intermediate/feed-forward layer.
-    hidden_dropout_prob: float. Dropout probability for the hidden layers.
-    attention_probs_dropout_prob: float. Dropout probability of the attention
-      probabilities.
-    initializer_range: float. Range of the initializer (stddev of truncated
-      normal).
-    do_return_all_layers: Whether to also return all layers or just the final
-      layer.
+    input_tensor: float张量，形状为[batch_size, seq_length, hidden_size].
+    attention_mask: (可选) int32张量，形状为[batch_size, seq_length,seq_length], 1表示可以被关注，0表示不可以被关注
+    hidden_size: int.Transformer的隐藏层大小.
+    num_hidden_layers: int. Transformer的层数.
+    num_attention_heads: int. Transformer中attention的头数.
+    intermediate_size: int. 每层中间前向传播时的维度
+    intermediate_act_fn: 非线性激活函数. 每层中间前向传播时使用
+    hidden_dropout_prob: float. 每层结果丢弃的概率
+    attention_probs_dropout_prob: float. attention得分概率丢弃的比例
+    initializer_range: float. 初始化的范围
+    do_return_all_layers: 返回所有层还是只返回最后一层
 
   Returns:
-    float Tensor of shape [batch_size, seq_length, hidden_size], the final
-    hidden layer of the Transformer.
+    float张量，形状为[batch_size, seq_length, hidden_size], Transformer最后一层结果.
+    如果do_return_all_layers是True，则返回list包含每一层结果
 
   Raises:
-    ValueError: A Tensor shape or parameter is invalid.
+    ValueError: 张量维度或参数无效
   """
+  # 隐藏层维度必须是attention头数的倍数
   if hidden_size % num_attention_heads != 0:
     raise ValueError(
         "The hidden size (%d) is not a multiple of the number of attention "
         "heads (%d)" % (hidden_size, num_attention_heads))
 
-  attention_head_size = int(hidden_size / num_attention_heads)
+  attention_head_size = int(hidden_size / num_attention_heads)    # 每一个attention头的维度
+  # 获取输入张量的维度，batch_size, seq_length, input_width
   input_shape = get_shape_list(input_tensor, expected_rank=3)
   batch_size = input_shape[0]
   seq_length = input_shape[1]
   input_width = input_shape[2]
 
-  # The Transformer performs sum residuals on all layers so the input needs
-  # to be the same as the hidden size.
+  # The Transformer需要进行残差相加，所以input_width与hidden_size需要一致
   if input_width != hidden_size:
     raise ValueError("The width of the input tensor (%d) != hidden size (%d)" %
                      (input_width, hidden_size))
 
-  # We keep the representation as a 2D tensor to avoid re-shaping it back and
-  # forth from a 3D tensor to a 2D tensor. Re-shapes are normally free on
-  # the GPU/CPU but may not be free on the TPU, so we want to minimize them to
-  # help the optimizer.
+  # 将3d张量转为2d张量，因为TPU上reshape方法会消耗资源，事先转换好减少后续reshape操作
   prev_output = reshape_to_matrix(input_tensor)
 
-  all_layer_outputs = []
+  all_layer_outputs = []    # 所有层的结果
   for layer_idx in range(num_hidden_layers):
     with tf.variable_scope("layer_%d" % layer_idx):
-      layer_input = prev_output
+      layer_input = prev_output    # 每层输入
 
       with tf.variable_scope("attention"):
         attention_heads = []
         with tf.variable_scope("self"):
+          # 计算多头self-attention
           attention_head = attention_layer(
               from_tensor=layer_input,
               to_tensor=layer_input,
@@ -845,12 +771,10 @@ def transformer_model(input_tensor,
         if len(attention_heads) == 1:
           attention_output = attention_heads[0]
         else:
-          # In the case where we have other sequences, we just concatenate
-          # them to the self-attention head before the projection.
+          # 如果多头attention是切分后分开计算的，直接拼接在一起
           attention_output = tf.concat(attention_heads, axis=-1)
 
-        # Run a linear projection of `hidden_size` then add a residual
-        # with `layer_input`.
+        # 进行线性映射后加上残差`layer_input`.
         with tf.variable_scope("output"):
           attention_output = tf.layers.dense(
               attention_output,
@@ -859,7 +783,7 @@ def transformer_model(input_tensor,
           attention_output = dropout(attention_output, hidden_dropout_prob)
           attention_output = layer_norm(attention_output + layer_input)
 
-      # The activation is only applied to the "intermediate" hidden layer.
+      # 进行中间的全连接处理
       with tf.variable_scope("intermediate"):
         intermediate_output = tf.layers.dense(
             attention_output,
@@ -867,24 +791,25 @@ def transformer_model(input_tensor,
             activation=intermediate_act_fn,
             kernel_initializer=create_initializer(initializer_range))
 
-      # Down-project back to `hidden_size` then add the residual.
+      # 在降维映射后加上残差attention_output
       with tf.variable_scope("output"):
         layer_output = tf.layers.dense(
             intermediate_output,
             hidden_size,
             kernel_initializer=create_initializer(initializer_range))
         layer_output = dropout(layer_output, hidden_dropout_prob)
-        layer_output = layer_norm(layer_output + attention_output)
+        layer_output = layer_norm(layer_output + attention_output)    # 每层输出
         prev_output = layer_output
         all_layer_outputs.append(layer_output)
 
   if do_return_all_layers:
     final_outputs = []
     for layer_output in all_layer_outputs:
-      final_output = reshape_from_matrix(layer_output, input_shape)
+      final_output = reshape_from_matrix(layer_output, input_shape)    # [batch_size, seq_length, hidden_size]
       final_outputs.append(final_output)
-    return final_outputs
+    return final_outputs    # 所有层的结果
   else:
+    # 转为3d张量，[batch_size, seq_length, hidden_size]
     final_output = reshape_from_matrix(prev_output, input_shape)
     return final_output
 

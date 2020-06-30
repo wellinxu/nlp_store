@@ -31,6 +31,13 @@ prefix_suffix_trie.py    #前后缀树
 double_array_trie.py  #双数组trie树
 acam.py  #ac自动机
 ```
+### read_source
+源码阅读        
+已实现部分：    
+```
+bert/  #bert相关源码阅读
+    modeling.py  # bert模型部分源码注释
+```
 ### statistical_algorithm
 统计学习算法实现，包含逻辑回归、支持向量机、条件随机场等等。    
 已实现部分:    

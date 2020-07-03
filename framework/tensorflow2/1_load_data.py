@@ -16,7 +16,7 @@ def load_numpy_data():
     return train_dataset
 
 
-# 加载生成器数据
+# 加载生成器数据,数据太大，加载不到内存或显存时，可以使用
 def load_gen_data():
     # 数据生成器
     def gen():
@@ -43,6 +43,7 @@ def trian():
     model.fit(train_dataset, epochs=5)
 
 
+# tf_record相关
 def create_bytes_feature(values):
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=list(values)))
 
@@ -65,7 +66,7 @@ def serialize_example(x_feature, y_feature):
     return example_proto.SerializeToString()
 
 
-def write_rfrecord():
+def write_tfrecord():
     with tf.io.TFRecordWriter("test.tf_record") as writer:
         for i in range(100):
             x, y = np.random.rand(12), np.random.randint(0, 2, size=1)
@@ -79,17 +80,48 @@ def read_tfrecord():
     for i in raw_dataset:
         example = tf.train.Example()
         example.ParseFromString(i.numpy())
-        print(example)
-read_tfrecord()
 
+        print(example.features.feature)
+
+
+# dateset相关处理
+dateset = tf.data.Dataset.from_tensor_slices([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+
+
+# map()
+dateset = dateset.map(lambda x: x-1)
+print(list(dateset.as_numpy_iterator()))    # [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+
+# shuffle()
+dateset = dateset.shuffle(10)
+print(list(dateset.as_numpy_iterator()))    # [5, 9, 0, 4, 3, 6, 1, 8, 2, 7]
+
+
+# filter()
+dateset = dateset.filter(lambda x: x < 5)
+print(list(dateset.as_numpy_iterator()))    # [0, 1, 2, 3, 4]
+
+
+# batch()
+dateset = dateset.batch(3)
+# [array([0, 1, 2]), array([3, 4, 5]), array([6, 7, 8]), array([9])]
+print(list(dateset.as_numpy_iterator()))
+
+
+# padded_batch
+dateset = tf.data.Dataset.from_tensor_slices([[i] for i in range(10)])
+dateset = dateset.padded_batch(3, padded_shapes=(2,), padding_values=0)
+# # [array([[0, 0], [1, 0], [2, 0]]), array([[3, 0], [4, 0], [5, 0]]), array([[6, 0], [7, 0], [8, 0]]), array([[9, 0]])]
+print(list(dateset.as_numpy_iterator()))
+
+#repeat()
+dateset = dateset.repeat(2)
+# [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+print(list(dateset.as_numpy_iterator()))
 
 
 # d = tf.data.Dataset()
-# d.from_tensor_slices()
 # d.take(1)
 # d.apply()
-# d.batch() # 使用
-# d.padded_batch()
-# d.shuffle() # 使用
-# d.map()
 

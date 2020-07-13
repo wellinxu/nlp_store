@@ -15,6 +15,7 @@ sort.py  # 排序算法
 tensorflow2/  # tf2.0的简单教程 
     0_start.py  # 快速入门教程
     1_load_data.py  # dataset,tf_record相关内容
+    2_variable_tensor  #变量、张量、梯度计算、各种operations
 ```
 ### papers
 论文算法复现，已实现部分：    

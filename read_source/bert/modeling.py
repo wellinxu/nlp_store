@@ -279,11 +279,16 @@ def get_activation(activation_string):
 
 
 def get_assignment_map_from_checkpoint(tvars, init_checkpoint):
-  """本文件中没有被使用Compute the union of the current variables and checkpoint variables."""
+  """
+  获取当前变量与初始化checkpoint变量中的交集
+  :param tvars: 可训练变量
+  :param init_checkpoint: 初始化使用的checkpoint
+  :return:
+  """
   assignment_map = {}
   initialized_variable_names = {}
 
-  name_to_variable = collections.OrderedDict()
+  name_to_variable = collections.OrderedDict()   # 获取变量的名称
   for var in tvars:
     name = var.name
     m = re.match("^(.*):\\d+$", name)
@@ -291,7 +296,7 @@ def get_assignment_map_from_checkpoint(tvars, init_checkpoint):
       name = m.group(1)
     name_to_variable[name] = var
 
-  init_vars = tf.train.list_variables(init_checkpoint)
+  init_vars = tf.train.list_variables(init_checkpoint)    # 获取checkpoint中的变量值
 
   assignment_map = collections.OrderedDict()
   for x in init_vars:

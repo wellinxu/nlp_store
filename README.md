@@ -39,6 +39,7 @@ acam.py  #ac自动机
 ```
 bert/  #bert相关源码阅读
     modeling.py  # bert模型部分源码注释
+    run_pretraining.py  # pretrain部分源码注释
 ```
 ### statistical_algorithm
 统计学习算法实现，包含逻辑回归、支持向量机、条件随机场等等。    

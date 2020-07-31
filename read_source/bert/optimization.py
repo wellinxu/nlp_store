@@ -1,6 +1,6 @@
 # coding=utf-8
 """
-源码阅读，结合
+源码阅读，结合https://note.youdao.com/ynoteshare1/index.html?id=0d8351f73fa7d4759a23f9eadb680b23&type=note
 查看，效果更好
 """
 # Copyright 2018 The Google AI Language Team Authors.
@@ -128,6 +128,9 @@ class AdamWeightDecayOptimizer(tf.train.Optimizer):
     self.beta_2 = beta_2
     self.epsilon = epsilon
     self.exclude_from_weight_decay = exclude_from_weight_decay
+    # 笔者自己添加的变量
+    self.beta_1_t = 1.0    # 用于修正一阶矩估计
+    self.beta_2_t = 1.0    # 用于修正二阶矩估计
 
   def apply_gradients(self, grads_and_vars, global_step=None, name=None):
     """实现Adam梯度更新算法"""
@@ -173,6 +176,66 @@ class AdamWeightDecayOptimizer(tf.train.Optimizer):
         update += self.weight_decay_rate * param     # L2正则化（权重衰减）
 
       update_with_lr = self.learning_rate * update    # 梯度下降的方向与量
+
+      next_param = param - update_with_lr    # 完成梯度更新
+
+      assignments.extend(
+          [param.assign(next_param),
+           m.assign(next_m),
+           v.assign(next_v)])    # 保存更新操作，参数更新，梯度的一阶和二阶矩估计更新
+    return tf.group(*assignments, name=name)
+
+
+  def apply_gradients_2(self, grads_and_vars, global_step=None, name=None):
+    """笔者自己实现的函数，在原来实现上添加了一阶与二阶矩估计修正，实现Adam梯度更新算法"""
+    assignments = []
+    self.beta_1_t *= self.beta_1
+    self.beta_2_t *= self.beta_2
+    # 循环各个变量与梯度
+    for (grad, param) in grads_and_vars:
+      if grad is None or param is None:
+        continue
+
+      param_name = self._get_variable_name(param.name)    # 获变量的名字
+
+      # 获取梯度的一阶矩估计
+      m = tf.get_variable(
+          name=param_name + "/adam_m",
+          shape=param.shape.as_list(),
+          dtype=tf.float32,
+          trainable=False,
+          initializer=tf.zeros_initializer())
+      # 获取梯度的二阶矩估计
+      v = tf.get_variable(
+          name=param_name + "/adam_v",
+          shape=param.shape.as_list(),
+          dtype=tf.float32,
+          trainable=False,
+          initializer=tf.zeros_initializer())
+
+      # 梯度的一阶矩与二阶矩估计更新
+      next_m = (
+          tf.multiply(self.beta_1, m) + tf.multiply(1.0 - self.beta_1, grad))
+      next_v = (
+          tf.multiply(self.beta_2, v) + tf.multiply(1.0 - self.beta_2,
+                                                    tf.square(grad)))
+
+      update = next_m / (tf.sqrt(next_v) + self.epsilon)   # 梯度下降的方向
+
+      # 对于Adam算法来说，如果直接将权重的平方加到loss函数上，这不是正确的
+      # L2正则化（权重衰减）方法，因为这样会影响Adam中m与v的计算。
+      #
+      # 我们需要一种不影响m/v参数的权重衰减方法，这里讲loss的优化与L2正则
+      # 分开计算，先根据Adam算法计算针对loss需要更新的量，然后加上L2正则
+      # 需要改变的量.
+      if self._do_use_weight_decay(param_name):
+        update += self.weight_decay_rate * param     # L2正则化（权重衰减）
+
+      update_with_lr = self.learning_rate * update    # 梯度下降的方向与量
+
+      # 修正一阶矩与二阶矩之后的结果
+      bias = tf.sqrt(1 - self.beta_2_t) / (1 - self.beta_1_t)
+      update_with_lr *= bias
 
       next_param = param - update_with_lr    # 完成梯度更新
 

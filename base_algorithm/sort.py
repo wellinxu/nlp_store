@@ -170,9 +170,10 @@ class FastSort(BaseSort):
 
     def sort(self):
         # self.fast(self.arg_list)
+        # self.fast(self.arg_list, 0, self.length-1)
         self.fast_list()
 
-    def fast_list(self):
+    def fast_list2(self):
         """非递归形式"""
         stack = [self.arg_list]
         result = []
@@ -206,7 +207,36 @@ class FastSort(BaseSort):
             stack.append(a_list)
         self.arg_list = result
 
-    def fast(self, arg_list):
+    def fast_list(self):
+        # 非递归
+        stack = [(0, self.length - 1)]
+        while stack:
+            start, end = stack.pop()
+            if start < end:
+                left = start - 1
+                p = self.arg_list[end]
+                for i in range(start, end):
+                    if self.arg_list[i] < p:
+                        self.swap(left+1, i)
+                        left += 1
+                self.swap(left + 1, end)
+                stack.append((left+1, end))
+                stack.append((start, left))
+
+    def fast(self, arg_list, start, end):
+        if start < end:
+            p = arg_list[end]
+            left = start - 1
+            for i in range(start, end + 1):
+                if arg_list[i] < p:
+                    self.swap(left+1, i)
+                    left += 1
+            self.swap(left+1, end)
+
+            self.fast(arg_list, start, left)
+            self.fast(arg_list, left+1, end)
+
+    def fast2(self, arg_list):
         """递归形式"""
         length = len(arg_list)
         if length < 2:
@@ -270,7 +300,7 @@ class HeapSort(BaseSort):
 
 if __name__ == '__main__':
     import random
-    arg_list = [i for i in range(1000)]
+    arg_list = [i for i in range(5000)]
     random.shuffle(arg_list)
     # print(arg_list)
     #sort = BubbleSort(arg_list.copy())
@@ -285,6 +315,7 @@ if __name__ == '__main__':
     sort.print()
     sort = FastSort(arg_list.copy())
     sort.print()
+    # print(sort.arg_list)
     sort = HeapSort(arg_list.copy())
     sort.print()
     #print(sort.arg_list)

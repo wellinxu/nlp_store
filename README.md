@@ -42,6 +42,7 @@ bert/  #bert相关源码阅读
     run_pretraining.py  # pretrain部分源码注释
     optimization.py  #optimization部分源码注释
     tokenization.py  #tokenization部分源码注释
+    create_pretraining_data.py  #create_pretraining_data部分源码注释
 ```
 ### statistical_algorithm
 统计学习算法实现，包含逻辑回归、支持向量机、条件随机场等等。    

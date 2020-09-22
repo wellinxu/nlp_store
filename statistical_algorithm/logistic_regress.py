@@ -21,7 +21,7 @@ class LogisticRegress(object):
             deltas = []
             for x, y in zip(self.xs, self.ys):
                 y_hat = self.prob(x)
-                delta = (y - y_hat)*x
+                delta = (y_hat - y)*x
                 deltas.append(delta)
             delta = np.mean(deltas, axis=0)
             self.params = self.params - self.lr * delta
@@ -31,12 +31,12 @@ class LogisticRegress(object):
         for i in range(self.cyclt):
             for x, y in zip(self.xs, self.ys):
                 y_hat = self.prob(x)
-                delta = (y - y_hat)*x
+                delta = (y_hat - y)*x
                 self.params = self.params - self.lr * delta
 
     def prob(self, x):
         x_w = -np.dot(x, self.params)
-        p = 1-1/(1+np.exp(x_w))
+        p = 1/(1+np.exp(x_w))
         return p
 
     def predict(self, x):
@@ -48,13 +48,13 @@ class LogisticRegress(object):
 
 if __name__ == '__main__':
     w = [1, -2, 3]
-    x = np.random.rand(100, 3)
+    x = np.random.rand(1000, 3)
     x = [[1, v[1], v[2]] for v in x]
     x = np.asarray(x)
-    x_w = np.dot(x, w)
-    y = 1/(1 + np.exp(-x_w))
+    x_w = -np.dot(x, w)
+    y = 1/(1 + np.exp(x_w))
     # print(y)
-    ys = [1 if i < 0.5 else 0 for i in y]
+    ys = [1 if i > 0.5 else 0 for i in y]
     lr = LogisticRegress(x, ys)
     print(lr.params)
     p_y = [lr.predict(i) for i in x]

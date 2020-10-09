@@ -1,3 +1,7 @@
+"""
+源码阅读，结合https://note.youdao.com/ynoteshare1/index.html?id=c9944d2f67f9d74ffee86220e671aea8&type=note
+查看，效果更好
+"""
 # coding=utf-8
 # Copyright 2018 The Google AI Language Team Authors.
 #
@@ -68,7 +72,7 @@ flags.DEFINE_integer(
 # 被遮蔽的概率
 flags.DEFINE_float("masked_lm_prob", 0.15, "Masked LM probability.")
 
-# 生成比max_seq_length更小的句子的概率，为了减少预训练与微调时句子长度不一致的问题
+# 生成比max_seq_length更短的句子的概率，为了减少预训练与微调时句子长度不一致的问题
 flags.DEFINE_float(
     "short_seq_prob", 0.1,
     "Probability of creating sequences which are shorter than the "
@@ -115,7 +119,7 @@ def write_instance_to_example_files(instances, tokenizer, max_seq_length,
   :return:
   """
   writers = []
-  for output_file in output_files:    # 文件会很大，所以会写入多个文件
+  for output_file in output_files:    # 文件会很大，所以会选择写入多个文件
     writers.append(tf.python_io.TFRecordWriter(output_file))
 
   writer_index = 0
@@ -137,9 +141,9 @@ def write_instance_to_example_files(instances, tokenizer, max_seq_length,
     assert len(input_mask) == max_seq_length
     assert len(segment_ids) == max_seq_length
 
-    masked_lm_positions = list(instance.masked_lm_positions)
-    masked_lm_ids = tokenizer.convert_tokens_to_ids(instance.masked_lm_labels)
-    masked_lm_weights = [1.0] * len(masked_lm_ids)
+    masked_lm_positions = list(instance.masked_lm_positions)    # 被遮蔽的位置
+    masked_lm_ids = tokenizer.convert_tokens_to_ids(instance.masked_lm_labels)    # 被遮蔽token的id
+    masked_lm_weights = [1.0] * len(masked_lm_ids)    # 实际遮蔽的权重为1，没有实际遮蔽的权重后续用0pad
 
     # 将遮蔽序列长度padding到“max_predictions_per_seq”，用0padding
     while len(masked_lm_positions) < max_predictions_per_seq:
@@ -204,7 +208,7 @@ def create_training_instances(input_files, tokenizer, max_seq_length,
                               max_predictions_per_seq, rng):
   """
   从行文本数据中创建训练样本
-  :param input_files:  输入行文件路径（或路径集合），[str]
+  :param input_files:  输入行文件路径集合，[str]
   :param tokenizer: token切分类，FullTokenizer
   :param max_seq_length: 允许的最大序列长度，int
   :param dupe_factor: 数据重复使用次数，默认10次，int
@@ -214,7 +218,7 @@ def create_training_instances(input_files, tokenizer, max_seq_length,
   :param rng: 随机数生成器
   :return: 训练样本list，[TrainingInstance]
   """
-  all_documents = [[]]
+  all_documents = [[]]    # 外层索引表示每篇文章，内层索引表示每句话
 
   # 输入文本格式：
   #（1）一句一行。需要是正真的一句，不能是一整个段落，也不能是文本的某个截断。
@@ -230,7 +234,7 @@ def create_training_instances(input_files, tokenizer, max_seq_length,
           break
         line = line.strip()
 
-        # Empty lines are used as document delimiters
+        # 空行用来分割文档
         if not line:
           all_documents.append([])
         tokens = tokenizer.tokenize(line)
@@ -243,7 +247,7 @@ def create_training_instances(input_files, tokenizer, max_seq_length,
 
   vocab_words = list(tokenizer.vocab.keys())
   instances = []
-  # 多次重复数据，每次都会对数据进行不同的mask
+  # 多次重复数据，每次都会对数据进行不同的mask，充分利用训练数据
   for _ in range(dupe_factor):
     for document_index in range(len(all_documents)):
       instances.extend(
@@ -273,7 +277,7 @@ def create_instances_from_document(
   """
   document = all_documents[document_index]
 
-  #最大长度要给 [CLS]（开头）, [SEP]（两句之间）, [SEP]（结尾）留三个位置
+  #最大长度要给 [CLS]（开头）, [SEP]（第一句结尾）, [SEP]（结尾）留三个位置
   max_num_tokens = max_seq_length - 3
 
   # 大多数情况下，我们都会填满整个句子，直到“max_seq_length”长度，因为短文本太浪费算力了。
@@ -493,7 +497,7 @@ def main(_):
   tokenizer = tokenization.FullTokenizer(
       vocab_file=FLAGS.vocab_file, do_lower_case=FLAGS.do_lower_case)
 
-  input_files = []
+  input_files = []    # 输入文本路径list
   for input_pattern in FLAGS.input_file.split(","):
     input_files.extend(tf.gfile.Glob(input_pattern))
 
@@ -508,7 +512,7 @@ def main(_):
       FLAGS.short_seq_prob, FLAGS.masked_lm_prob, FLAGS.max_predictions_per_seq,
       rng)
 
-  output_files = FLAGS.output_file.split(",")
+  output_files = FLAGS.output_file.split(",")    # 输出路径list
   tf.logging.info("*** Writing to output files ***")
   for output_file in output_files:
     tf.logging.info("  %s", output_file)
@@ -519,8 +523,8 @@ def main(_):
 
 
 if __name__ == "__main__":
-  # 必要字段
+  # 必要参数
   flags.mark_flag_as_required("input_file")
   flags.mark_flag_as_required("output_file")
   flags.mark_flag_as_required("vocab_file")
-  tf.app.run()
+  tf.app.run()    # 运行main()函数

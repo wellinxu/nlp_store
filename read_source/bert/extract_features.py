@@ -1,5 +1,5 @@
 """
-源码阅读，结合
+源码阅读，结合https://note.youdao.com/ynoteshare1/index.html?id=3adbe78b51abc801d7e79144162b730b&type=note
 查看，效果更好
 """
 # coding=utf-8
@@ -454,4 +454,4 @@ if __name__ == "__main__":
   flags.mark_flag_as_required("bert_config_file")
   flags.mark_flag_as_required("init_checkpoint")
   flags.mark_flag_as_required("output_file")
-  tf.app.run()
+  tf.app.run()    # 运行main

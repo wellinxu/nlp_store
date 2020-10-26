@@ -113,8 +113,20 @@ def create_model_by_subclass():
     return MyModel()
 
 
-model = create_model_by_sequential()    # 使用sequential构建模型
+def create_model_by_functional():
+    # 使用函数式api构建模型
+    inputs = tf.keras.Input(shape=(256,))
+    emb = tf.keras.layers.Embedding(vocab_size, 16)(inputs)
+    avg_pool = tf.keras.layers.GlobalAveragePooling1D()(emb)
+    d1 = tf.keras.layers.Dense(16, activation="relu")(avg_pool)
+    outputs = tf.keras.layers.Dense(1, activation="sigmoid")(d1)
+    model = tf.keras.Model(inputs=inputs, outputs=outputs)
+    return model
+
+
+# model = create_model_by_sequential()    # 使用sequential构建模型
 # model = create_model_by_subclass()    # 使用模型子类化构建模型
+model = create_model_by_functional()    # 使用模型子类化构建模型
 
 
 # 配置模型训练参数

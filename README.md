@@ -17,6 +17,7 @@ tensorflow2/  # tf2.0的简单教程
     1_load_data.py  # dataset,tf_record相关内容
     2_variable_tensor  # 变量、张量、梯度计算、各种operations
     3_customize_layer_model  # 自定义层与模型
+    4_train_evaluate  # 内置的模型训练与评估
 ```
 ### papers
 论文算法复现，已实现部分：    

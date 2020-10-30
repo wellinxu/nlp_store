@@ -20,6 +20,7 @@ tensorflow2/  # tf2.0的简单教程
     4_train_evaluate  # 内置的模型训练与评估
     5_customize_train  # 自定义训练
     6_customize_other  # 自定义callback、loss、metrics
+hadoop.sh  # hadoop的简单使用
 ```
 ## papers
 论文算法复现，已实现部分：    

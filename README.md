@@ -1,14 +1,14 @@
 NLP杂货铺，python实现nlp相关算法、工具，辅助理解相关算法
 
-## 目录
+# 目录
 
-### base_algorithm
+## base_algorithm
 基础算法实现，如排序、树等等。
 已实现部分：    
 ```
 sort.py  # 排序算法
 ```
-### framework
+## framework
 框架工具使用，主要会展示tensorflow/pytorch/docker/shell等工具的简单使用。      
 已实现部分:    
 ```
@@ -21,12 +21,12 @@ tensorflow2/  # tf2.0的简单教程
     5_customize_train  # 自定义训练
     6_customize_other  # 自定义callback、loss、metrics
 ```
-### papers
+## papers
 论文算法复现，已实现部分：    
 ```
 text_fooler.py  # Is BERT Really Robust? A Strong Baseline for Natural Language Attack on Text Classification and Entailment
 ```
-### pattern_match
+## pattern_match
 模式识别，包含正则的使用，kmp，trie树等算法的实现。    
 已实现部分：    
 ```
@@ -37,7 +37,7 @@ prefix_suffix_trie.py    #前后缀树
 double_array_trie.py  #双数组trie树
 acam.py  #ac自动机
 ```
-### read_source
+## read_source
 源码阅读        
 已实现部分：    
 ```
@@ -49,7 +49,7 @@ bert/  #bert相关源码阅读
     create_pretraining_data.py  #create_pretraining_data部分源码注释
     extract_feature.py  #extract_feature部分源码注释
 ```
-### statistical_algorithm
+## statistical_algorithm
 统计学习算法实现，包含逻辑回归、支持向量机、条件随机场等等。    
 已实现部分:    
 ```
@@ -62,3 +62,19 @@ hmm.py  #隐马尔科夫
 crf.py  #条件随机场
 tree/  #树相关模型
 ```
+
+# TODO
+> 1. Tensorflow2.0学习教程
+>   1. GPU与分布式训练
+>   2. 性能分析与优化
+>   3. 模型保存
+>   4. 服务部署
+>   5. 其他待定
+> 2. BERT源码阅读
+>   1. run_classifier.py
+>   2. run_squad.py
+> 3. 论文阅读与复现
+>   1. Word2vec
+>   2. FastText
+>   3. TextCNN
+>   4. 待定待定

@@ -220,7 +220,7 @@ class FastSort(BaseSort):
                         self.swap(left+1, i)
                         left += 1
                 self.swap(left + 1, end)
-                stack.append((left+1, end))
+                stack.append((left+2, end))
                 stack.append((start, left))
 
     def fast(self, arg_list, start, end):
@@ -285,11 +285,11 @@ class HeapSort(BaseSort):
         t = i
             
         if left < length and self.arg_list[left] < self.arg_list[i]:
-            self.step += 1
+            # self.step += 1
                 #self.swap(left, i)
             i = left
         if right < length and self.arg_list[right] < self.arg_list[i]:
-            self.step += 1
+            # self.step += 1
             i = right
                 #self.swap(right, i)
         if t != i:

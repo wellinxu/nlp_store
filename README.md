@@ -26,6 +26,7 @@ hadoop.sh  # hadoop的简单使用
 论文算法复现，已实现部分：    
 ```
 text_fooler.py  # Is BERT Really Robust? A Strong Baseline for Natural Language Attack on Text Classification and Entailment
+word2vec.py # Efﬁcient Estimation of Word Representationsin Vector Space
 ```
 ## pattern_match
 模式识别，包含正则的使用，kmp，trie树等算法的实现。    

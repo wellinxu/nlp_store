@@ -29,9 +29,7 @@ class BaseWord2vecModel(tf.keras.models.Model):
         self.voc_size = voc_size
         self.is_huffman = is_huffman
         self.is_negative = is_negative
-        self.embedding = tf.keras.layers.Embedding(voc_size, emb_dim)
-        self.layer_norm = tf.keras.layers.LayerNormalization(
-            name="layer_norm", axis=-1, epsilon=1e-12, dtype=tf.float32)
+        self.embedding = tf.keras.layers.Embedding(voc_size, emb_dim, embeddings_regularizer="l2")
         if not self.is_huffman and not is_negative:
             # 不使用huffman树也不使用负采样，所有词的输出参数
             self.output_weight = self.add_weight(shape=(voc_size, emb_dim),
@@ -56,7 +54,6 @@ class BaseWord2vecModel(tf.keras.models.Model):
         # negative_index: [negatuve_num]
         x, huffman_label, huffman_index, y, negative_index = inputs
         x = self.embedding(x)    # ［context_len, emb_dim］
-        x = self.layer_norm(x)    # 层标准化，自己添加非模型原始结构
         x = tf.reduce_sum(x, axis=-2)    # [emb_dim]
 
         loss = 0
@@ -118,7 +115,7 @@ class BaseWord2vecModel(tf.keras.models.Model):
 
 
 class Word2vec(object):
-    def __init__(self, docs=None, emb_dim=100, windows=5, negative_num=10, is_cbow=True, is_huffman=True, is_negative=False, epochs=3, save_path=None):
+    def __init__(self, docs=None, emb_dim=100, windows=5, negative_num=10, is_cbow=True, is_huffman=True, is_negative=False, epochs=5, save_path=None, min=3):
         self.docs = docs    # [[我 是 一段 文本],[这是 第二段 文本]]
         self.windows = windows    # 窗口长度
         self.emb_dim = emb_dim    # 词向量维度
@@ -131,6 +128,7 @@ class Word2vec(object):
         self.negative_num = negative_num    # 负采样数量
         self.epochs = epochs    # 训练轮次
         self.save_path = save_path    # 模型保存路径
+        self.min = min    # 最低出现次数
         if docs:  # 训练模型
             self.build_word_dict()    # 构建词典，获取词频
             self.create_train_data()    # 创建训练数据
@@ -142,7 +140,7 @@ class Word2vec(object):
 
     def train(self):
         sample_num = len(self.xs)    # 样本数量
-        optimizer = tf.optimizers.SGD(0.025)    # 优化器
+        optimizer = tf.optimizers.SGD(0.01)    # 优化器
         # 基础word2vec模型
         self.model = BaseWord2vecModel(self.voc_size, self.emb_dim, self.is_huffman, self.is_negative)
         # 模型训练
@@ -213,10 +211,11 @@ class Word2vec(object):
         self.ys = []
         y_index = self.windows // 2
         for doc in self.docs:
-            if len(doc) < self.windows: continue
-            for i in range(0, len(doc) - self.windows + 1):
-                words = doc[i:i+self.windows]
-                words = [self.word_map[w] for w in words]
+            idoc = [self.word_map[w] for w in doc if w in self.word_map.keys()]
+            if len(idoc) < self.windows: continue
+            for i in range(0, len(idoc) - self.windows + 1):
+                words = idoc[i:i+self.windows]
+                # words = [self.word_map[w] for w in words]
                 y = [words.pop(y_index)]
                 words, y = np.array(words), np.array(y)
                 if self.is_cbow:    # 构建CBOW数据
@@ -275,22 +274,21 @@ class Word2vec(object):
 
     def build_word_dict(self):
         # 构建词典，获取词频
-        self.words = []    # (频率，id)
-        self.word_map = {}    # {词:id}
         word_num_map = {}    # 频率
         for doc in self.docs:
             if len(doc) < self.windows: continue
             for word in doc:
-                if word not in self.word_map.keys():
-                    self.word_map[word] = len(self.word_map)
-                    self.words.append(word)
                 word_num_map[word] = word_num_map.get(word, 0) + 1
+
         # 词频设为原本的0.75次方，根据词频进行负采样的时候，可以降低高词频的概率，提高低词频的概率（高词频的概率仍然大于低词频的概率）
-        word_num_map = {k:np.power(v, 0.75) for k, v in word_num_map.items()}
+        word_num_map = {k:np.power(v, 0.75) for k, v in word_num_map.items() if v >= self.min}
         num = sum(word_num_map.values())
         word_num_map = {k: v/num for k, v in word_num_map.items()}
 
-        self.words = [(word_num_map[w], self.word_map[w]) for w in self.words]
+        self.word_map = {}  # {词:id}
+        for k in word_num_map.keys():
+            self.word_map[k] = len(self.word_map)
+        self.words = [(v, self.word_map[w]) for w, v in word_num_map.items()]  # (频率，id)
         self.words.sort()    # 根据频率排序
         self.voc_size = len(self.words)    # 词表大小
         self.id_word_map = {v: k for k, v in self.word_map.items()}  # {id:词}
@@ -407,7 +405,7 @@ if __name__ == '__main__':
     print("start train word2vec's model")
 
     # 训练
-    word2vec = Word2vec(docs[:100], 50, is_cbow=False, is_huffman=False, is_negative=True, save_path="word2vec.txt")
+    word2vec = Word2vec(docs, 50, is_cbow=False, is_huffman=True, is_negative=True, save_path="word2vec.txt")
 
     # # 测试向量
     # word2vec = Word2vec()

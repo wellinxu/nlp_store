@@ -27,6 +27,7 @@ hadoop.sh  # hadoop的简单使用
 ```
 text_fooler.py  # Is BERT Really Robust? A Strong Baseline for Natural Language Attack on Text Classification and Entailment
 word2vec.py # Efﬁcient Estimation of Word Representationsin Vector Space
+fasttext.py # Bag of Tricks for Efficient Text Classification和Enriching Word Vectors with Subword Information
 ```
 ## pattern_match
 模式识别，包含正则的使用，kmp，trie树等算法的实现。    

@@ -1,4 +1,7 @@
 """
+> 论文标题：Efficient Estimation of Word Representations in Vector Space
+> 论文链接：https://arxiv.org/pdf/1301.3781.pdf
+
 word2vec的复现，前向传播与反向传播都是使用的tensorflow2
 本文实现了：
     1、CBOW与SG两种结构
@@ -15,6 +18,25 @@ word2vec = Word2vec(docs, emb_dim=50, is_cbow=True, is_huffman=True, is_negative
 word2vec = Word2vec() # 初始化
 word2vec.load_txt("word2vec.txt") # 加载模型
 print(word2vec.similarity(["湖人", "首发"])) # 计算相似词
+
+简单根据THUCNews文本分类验证数据集cnews.val.txt的5000条文本进行训练，得到的词向量部分展示结果如下：
+输入文本：首发
+[[('首发', 0.99999994), ('晋级', 0.9377455), ('队', 0.93740684), ('常规赛', 0.93617535), ('第六', 0.9326732)]]
+输入文本：科比
+[[('科比', 1.0), ('韦德', 0.9673105), ('兰多夫', 0.96284187), ('加索尔', 0.9588836), ('罗斯', 0.9409601)]]
+输入文本：北京
+[[('北京', 1.0000001), ('北京市', 0.8446522), ('新东方学校', 0.8283277), ('上海', 0.8194953), ('新华社', 0.8072852)]]
+输入文本：基金
+[[('基金', 1.0000001), ('型基金', 0.77347696), ('公司', 0.76423645), ('个股', 0.7516239), ('券商', 0.74068314)]]
+输入文本：中锋
+[[('中锋', 0.99999994), ('后卫', 0.9898231), ('控卫', 0.985808), ('替补', 0.98111683), ('查尔斯', 0.9803183)]]
+输入文本：索尼
+[[('索尼', 0.99999994), ('尼康', 0.88201267), ('三星', 0.872331), ('松下', 0.8648628), ('佳能', 0.84469694)]]
+输入文本：减仓
+[[('减仓', 1.0), ('增仓', 0.9759512), ('加仓', 0.9639442), ('0.70%', 0.9525898), ('债基', 0.9470636)]]
+输入文本：湖人
+[[('湖人', 1.0000001), ('热火', 0.9544255), ('凯尔特人', 0.9497543), ('马刺', 0.94464326), ('魔术', 0.93650496)]]
+
 """
 import tensorflow as tf
 import numpy as np
@@ -24,20 +46,20 @@ import time
 
 class BaseWord2vecModel(tf.keras.models.Model):
     # 当前的实现没有batch维度，是一个样本一个样本进行训练
-    def __init__(self, voc_size, emb_dim, is_huffman=True, is_negative=False):
+    def __init__(self, voc_size, emb_dim, is_huffman=True, is_negative=False, ngram_num=0):
         super(BaseWord2vecModel, self).__init__()
         self.voc_size = voc_size
         self.is_huffman = is_huffman
         self.is_negative = is_negative
-        self.embedding = tf.keras.layers.Embedding(voc_size, emb_dim, embeddings_regularizer="l2")
+        self.embedding = tf.keras.layers.Embedding(voc_size+ngram_num, emb_dim, embeddings_regularizer="l2")
         if not self.is_huffman and not is_negative:
             # 不使用huffman树也不使用负采样，所有词的输出参数
             self.output_weight = self.add_weight(shape=(voc_size, emb_dim),
                                                  initializer=tf.zeros_initializer, trainable=True)
             self.softmax = tf.keras.layers.Softmax()
         if self.is_huffman:
-            # 所有节点的参数，huffman树压缩为数组的时候，保留了所有叶子节点，所以数组长度为2*voc_size
-            # 也可以选择只保留非叶子节点，这样长度可减半
+            # 所有结点的参数，huffman树压缩为数组的时候，保留了所有叶子结点，所以数组长度为2*voc_size
+            # 也可以选择只保留非叶子结点，这样长度可减半
             self.huffman_params = tf.keras.layers.Embedding(2*voc_size, emb_dim,
                                                             embeddings_initializer=tf.keras.initializers.zeros)
             self.huffman_choice = tf.keras.layers.Embedding(2, 1, weights=(np.array([[-1], [1]]),))
@@ -69,23 +91,23 @@ class BaseWord2vecModel(tf.keras.models.Model):
         # huffman树loss计算
         if self.is_huffman:
             # # 各个label的code_len不一致，所以不能一起算，除非补齐再添加一个mask输入
-            # # 获取huffman树编码上的各个节点参数
+            # # 获取huffman树编码上的各个结点参数
             # huffman_param = self.huffman_params(huffman_label)  # [label_size, code_len, emb_dim]
-            # # 各节点参数与x点积
+            # # 各结点参数与x点积
             # huffman_x = tf.einsum("lab,b->la", huffman_param, x)  # [label_size,code_len]
-            # # 获取每个节点是左节点还是右节点
+            # # 获取每个结点是左结点还是右结点
             # tem_label = tf.squeeze(self.huffman_choice(huffman_label), axis=-1)  # [label_size, code_len]
-            # # 左节点：sigmoid(-WX),右节点sigmoid(WX)
+            # # 左结点：sigmoid(-WX),右结点sigmoid(WX)
             # l = tf.sigmoid(tf.einsum("la,la->la", huffman_x, tem_label))  # [label_size, code_len]
             # loss -= tf.reduce_sum(tf.math.log(l))
             for tem_label, tem_index in zip(huffman_label, huffman_index):
-                # 获取huffman树编码上的各个节点参数
+                # 获取huffman树编码上的各个结点参数
                 huffman_param = self.huffman_params(tem_index)    # [code_len, emb_dim]
-                # 各节点参数与x点积
+                # 各结点参数与x点积
                 huffman_x = tf.einsum("ab,b->a", huffman_param, x)    # [code_len]
-                # 获取每个节点是左节点还是右节点
+                # 获取每个结点是左结点还是右结点
                 tem_label = tf.squeeze(self.huffman_choice(tem_label), axis=-1)    # [code_len]
-                # 左节点：sigmoid(-WX),右节点sigmoid(WX)
+                # 左结点：sigmoid(-WX),右结点sigmoid(WX)
                 l = tf.sigmoid(tf.einsum("a,a->a", huffman_x, tem_label))    # [code_len]
                 l = tf.math.log(l)
                 loss -= tf.reduce_sum(l)
@@ -115,7 +137,8 @@ class BaseWord2vecModel(tf.keras.models.Model):
 
 
 class Word2vec(object):
-    def __init__(self, docs=None, emb_dim=100, windows=5, negative_num=10, is_cbow=True, is_huffman=True, is_negative=False, epochs=5, save_path=None, min=3):
+    def __init__(self, docs=None, emb_dim=100, windows=5, negative_num=10, is_cbow=True, is_huffman=True,
+                 is_negative=False, epochs=2, save_path=None, min=3):
         self.docs = docs    # [[我 是 一段 文本],[这是 第二段 文本]]
         self.windows = windows    # 窗口长度
         self.emb_dim = emb_dim    # 词向量维度
@@ -123,7 +146,7 @@ class Word2vec(object):
         self.is_huffman = is_huffman    # 是否使用huffman树
         self.is_negative = is_negative    # 是否使用负采样
         self.huffman_label = []    # huffman数据的标签，判断每次选择左子树还是右子树
-        self.huffman_index = []   # huffman数据的编码，用来获取编码上节点的权重
+        self.huffman_index = []   # huffman数据的编码，用来获取编码上结点的权重
         self.negative_index = []    # 负采样的词索引
         self.negative_num = negative_num    # 负采样数量
         self.epochs = epochs    # 训练轮次
@@ -228,49 +251,16 @@ class Word2vec(object):
         # 构建huffman数据
         if self.is_huffman:
             huffman_tree = HuffmanTree(self.words)    # 根据词与词频，构建huffman树
-            for labels in self.ys:
-                tlabels = []
-                for label in labels:
-                    tlabels.append(np.array(huffman_tree.word_code_map[label]))
-                index = []
-                for tlabel in tlabels:
-                    tem_index = [0]
-                    for l in tlabel[:-1]:
-                        ind = huffman_tree.nodes_list[tem_index[-1]] + l
-                        tem_index.append(ind)
-                    index.append(np.array(tem_index))
-                self.huffman_label.append(tlabels)  # 获取标签词在huffman树中的编码
-                self.huffman_index.append(index)    # 获取标签词在huffman树中的编码上对应的所有非叶子节点
+            self.huffman_label, self.huffman_index = huffman_tree.create_label(self.ys)
         else:    # 不适用huffman的时候，添加空数组
             self.huffman_label = [0 for i in self.ys]
             self.huffman_index = [0 for i in self.ys]
 
         # 构建负采样数据
         if self.is_negative:
-            # 如果"我 爱 你 啊"出现的概率分别是0.4,0.2,0.3,,0.1，
-            # 那么word_end_p就为[0.4,0.6,0.9, 1.0],即[0.4,0.4+0.2,0.4+0.2+0.3,0.4+0.2+0.3+0.1]
-            word_end_p = [self.words[0][0]]    # 每个词出现的概率段
-            for i in range(1, self.voc_size):
-                word_end_p.append(word_end_p[-1]+self.words[i][0])
-            # 为每一条训练数据抽取负样本
-            for y in self.ys:
-                indexs = []
-                while len(indexs) < self.negative_num * len(y):
-                    index = self._binary_search(random.random(), word_end_p, 0, self.voc_size-1)
-                    # 随机抽取一个词，不能再标签中也不能已经被抽到
-                    if index not in indexs and index not in y:
-                        indexs.append(index)
-                self.negative_index.append(np.array(indexs))
+            self.negative_index = negetive_sample(self.words, self.ys, self.negative_num)
         else:    # 不使用负采样的时候，添加空数组
             self.negative_index = [0 for i in self.ys]
-
-    def _binary_search(self, n, nums, start, end):
-        # 二分查找，查找n在nums[start:end]数组的那个位置
-        if start == end: return end
-        mid = (start+end) >> 1
-        if nums[mid] >= n:
-            return self._binary_search(n, nums, start, mid)
-        return self._binary_search(n, nums, mid+1, end)
 
     def build_word_dict(self):
         # 构建词典，获取词频
@@ -299,17 +289,17 @@ class Word2vec(object):
 
 class Node(object):
     def __init__(self, key, value):
-        self.key = key    # 本文代码里huffman中，非叶子节点都为None
+        self.key = key    # 本文代码里huffman中，非叶子结点都为None
         self.value = value    # 权重
-        # 编码，即重跟节点走到本节点的方向，0表示左子树，1表示右子树
-        # 010表示跟节点->左子树->右子树->左子树（本节点）
-        self.code = []    # 记录当前节点在整个huffman树中的编码
-        self.index = 0    # 第几个节点，压缩为数组用，即为该节点在数组型的huffman树种的索引位置
+        # 编码，即重跟结点走到本结点的方向，0表示左子树，1表示右子树
+        # 010表示跟结点->左子树->右子树->左子树（本结点）
+        self.code = []    # 记录当前结点在整个huffman树中的编码
+        self.index = 0    # 第几个结点，压缩为数组用，即为该结点在数组型的huffman树种的索引位置
         self.left = None
         self.right = None
 
     def combine(self, node):
-        # 两棵树（两个节点）合并成一个新树，叶子节点放在新树的右子树上
+        # 两棵树（两个结点）合并成一个新树，叶子结点放在新树的右子树上
         new_node = Node(None, self.value + node.value)
         if self.key is not None:
             new_node.right = self
@@ -321,8 +311,8 @@ class Node(object):
 
 
 class HuffmanTree(object):
-    # 用一个数组表示huffman树的所有非叶子节点
-    # 用word_code_map表记录根到每个叶子节点的编码
+    # 用一个数组表示huffman树的所有非叶子结点
+    # 用word_code_map表记录根到每个叶子结点的编码
     def __init__(self, words):
         start = time.time()
         words.sort()  # 根据频率排序
@@ -334,7 +324,7 @@ class HuffmanTree(object):
 
     def build_huffman_tree(self):
         # 构建huffman树
-        # 每个元素都构成单节点的树，并按照权重重大到小排列
+        # 每个元素都构成单结点的树，并按照权重重大到小排列
         # 合并权重最小的两个子树，并以权重和作为新树的权重
         # 将新树按照权重大小插入到序列中
         # 重复上述两步，直到只剩一棵树
@@ -355,18 +345,21 @@ class HuffmanTree(object):
                         right = i
                         i = (left+right) >> 1
                 else:
-                    if i == 0 or i == l:
+                    if i == 0:
                         nodes.insert(i, new_node)
+                        break
+                    if i == l:
+                        nodes.insert(i+1, new_node)
                         break
                     left = i
                     i = (left+right) >> 1
 
         # 将树压缩为数组
-        # 数组中每一个元素都是树种的一个节点，数组中的值表示该节点的左节点的位置，如果值跟索引一样大，表示此节点是叶子节点没有子节点
-        # 跟节点 root.index = 0
-        # 叶子节点 nodes_list[node.index] = node.index
-        # 非叶子节点 nodes_list[node.index] = node.left.index
-        # 非叶子节点 nodes_list[node.index] + 1 = node.right.index
+        # 数组中每一个元素都是树种的一个结点，数组中的值表示该结点的左结点的位置，如果值跟索引一样大，表示此结点是叶子结点没有子结点
+        # 跟结点 root.index = 0
+        # 叶子结点 nodes_list[node.index] = node.index
+        # 非叶子结点 nodes_list[node.index] = node.left.index
+        # 非叶子结点 nodes_list[node.index] + 1 = node.right.index
         stack = [nodes[0]]
         while stack:
             new_stack = []
@@ -375,16 +368,75 @@ class HuffmanTree(object):
                 if node.key is not None:   # 叶子结点
                     self.word_code_map[node.key] = node.code  # 保存编码
                     self.nodes_list.append(node)  # 在数组中添加叶子结点本身
-                if node.right:
-                    node.right.code = node.code + [1]
-                    new_stack.append(node.right)
                 if node.left:
                     # 在数组相应位置添加该结点的左结点
                     self.nodes_list.append(node.left)
                     node.left.code = node.code + [0]
                     new_stack.append(node.left)
+                if node.right:
+                    node.right.code = node.code + [1]
+                    new_stack.append(node.right)
             stack = new_stack
         self.nodes_list = [node.index for node in self.nodes_list]
+
+    def create_label(self, ys):
+        """
+        生成huffman树的label，label的编码及经过的结点索引
+        :param ys: [[]]，每一个样本的标签也是个list，因为一个样本可能有多个标签的情况
+        :return: 
+        """
+        huffman_label, huffman_index = [], []
+        for labels in ys:
+            tlabels = []
+            for label in labels:
+                tlabels.append(np.array(self.word_code_map[label]))
+            index = []
+            for tlabel in tlabels:
+                tem_index = [0]
+                for l in tlabel[:-1]:
+                    ind = self.nodes_list[tem_index[-1]] + l
+                    tem_index.append(ind)
+                index.append(np.array(tem_index))
+            huffman_label.append(tlabels)  # 获取标签词在huffman树中的编码
+            huffman_index.append(index)  # 获取标签词在huffman树中的编码上对应的所有非叶子结点
+        return huffman_label, huffman_index
+
+
+def negetive_sample(labels, ys, negative_num):
+    # labels:[(频率，标签)]
+    start = time.time()
+    # 如果"我 爱 你 啊"出现的概率分别是0.4,0.2,0.3,,0.1，
+    # 那么word_end_p就为[0.4,0.6,0.9, 1.0],即[0.4,0.4+0.2,0.4+0.2+0.3,0.4+0.2+0.3+0.1]
+    word_end_p = [labels[0][0]]  # 每个词出现的概率段
+    voc_size = len(labels)
+    for i in range(1, voc_size):
+        word_end_p.append(word_end_p[-1] + labels[i][0])
+
+    def binary_search(n, nums, start, end):
+        # 二分查找，查找n在nums[start:end]数组的那个位置
+        if start == end: return end
+        mid = (start+end) >> 1
+        if nums[mid] >= n:
+            return binary_search(n, nums, start, mid)
+        return binary_search(n, nums, mid+1, end)
+
+    # 为每一条训练数据抽取负样本
+    negative_index = []
+    for y in ys:
+        indexs = []
+        if len(word_end_p) < (1 + negative_num) * len(y):
+            print("负采样数量太多，标签太少，不够使用")
+            raise
+        while len(indexs) < negative_num * len(y):
+            index = binary_search(random.random(), word_end_p, 0, voc_size - 1)
+            # 随机抽取一个词，不能再标签中也不能已经被抽到
+            label = labels[index][1]
+            if label not in indexs and label not in y:
+                indexs.append(label)
+        negative_index.append(np.array(indexs))
+    print("negative sample end,time:", time.time() - start)
+    return negative_index
+
 
 
 if __name__ == '__main__':
@@ -410,7 +462,7 @@ if __name__ == '__main__':
     # # 测试向量
     # word2vec = Word2vec()
     # word2vec.load_txt("word2vec.txt")
-    print(word2vec.similarity(["湖人", "首发"]))
+    print(word2vec.similarity(["湖人"]))
     while True:
         w = input("输入文本：")
         try:

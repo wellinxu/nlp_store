@@ -3,6 +3,7 @@
 > 论文链接：https://arxiv.org/pdf/1301.3781.pdf
 
 word2vec的复现，前向传播与反向传播都是使用的tensorflow2
+可参考https://zhuanlan.zhihu.com/p/330583437
 本文实现了：
     1、CBOW与SG两种结构
     2、huffman树与负采样两种加速方式

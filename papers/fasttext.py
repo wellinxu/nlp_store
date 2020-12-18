@@ -6,6 +6,7 @@
 > 论文链接：https://arxiv.org/pdf/1607.04606.pdf
 
 fasttext论文复现， 涉及到上诉两个论文中的模型，文本分类模型与文本表示模型
+可参考https://zhuanlan.zhihu.com/p/337939938
 本文基于tensorflow2实现了：
     1、文本分类模型，cbow+词ngram特征(hash处理)+huffman树
     2、文本表示模型，skip-gram+字符ngram特征（hash处理）+负采样
@@ -534,7 +535,8 @@ class Fasttext(object):
                 h = h % self.ngram_num    # 用hash值的最后几位作为新hash值
                 if h not in idmap.keys():
                     idmap[h] = len(idmap) + self.voc_size
-                self.ngram2id_map[w] = h
+                self.ngram2id_map[w] = idmap[h]
+        self.ngram_num = len(self.ngram2id_map)
 
     def _get_ngram(self, alist, is_train=True):
         # 获取alist中包含的ngram特征
@@ -574,8 +576,8 @@ if __name__ == '__main__':
 
     # embedding计算
     docs, labels = get_data(r"D:\BaiduNetdiskDownload\cnews\cnews.val.word.txt", False)
-    fasttext = Fasttext(docs, emb_dim=50, save_path="fasttext_model")
-    # fasttext = Fasttext(save_path="fasttext_model")
+    # fasttext = Fasttext(docs[:100], emb_dim=50, save_path="fasttext_model")
+    fasttext = Fasttext(save_path="fasttext_model")
     print(fasttext.similarity(["湖人"]))
     while True:
         w = input("输入文本：")

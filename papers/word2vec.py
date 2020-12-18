@@ -319,7 +319,8 @@ class HuffmanTree(object):
         self.words = words    # [(value:频次, key:词)]，由小到大排序
         self.word_code_map = {}    # 词在huffman树中的编码映射
         self.nodes_list = []     # 压缩为数组的huffman树
-        self.build_huffman_tree()
+        if self.words:
+            self.build_huffman_tree()
         print("build huffman tree end,time:", time.time()-start)
 
     def build_huffman_tree(self):
@@ -393,8 +394,8 @@ class HuffmanTree(object):
             index = []
             for tlabel in tlabels:
                 tem_index = [0]
-                for l in tlabel[:-1]:
-                    ind = self.nodes_list[tem_index[-1]] + l
+                for c in tlabel[:-1]:
+                    ind = self.nodes_list[tem_index[-1]] + c
                     tem_index.append(ind)
                 index.append(np.array(tem_index))
             huffman_label.append(tlabels)  # 获取标签词在huffman树中的编码
@@ -420,23 +421,70 @@ def negetive_sample(labels, ys, negative_num):
             return binary_search(n, nums, start, mid)
         return binary_search(n, nums, mid+1, end)
 
+    len_y = len(ys[0])
+    if voc_size < (1 + negative_num) * len_y:
+        print("负采样数量太多，标签太少，不够使用")
+        raise
+    num = negative_num * len_y
+
     # 为每一条训练数据抽取负样本
     negative_index = []
     for y in ys:
-        indexs = []
-        if len(word_end_p) < (1 + negative_num) * len(y):
-            print("负采样数量太多，标签太少，不够使用")
-            raise
-        while len(indexs) < negative_num * len(y):
+        indexs = set()
+        yset = set(y)
+        while len(indexs) < num:
             index = binary_search(random.random(), word_end_p, 0, voc_size - 1)
-            # 随机抽取一个词，不能再标签中也不能已经被抽到
+            # 随机抽取一个词，不能在标签中也不能已经被抽到
             label = labels[index][1]
             if label not in indexs and label not in y:
-                indexs.append(label)
-        negative_index.append(np.array(indexs))
+                indexs.add(label)
+        negative_index.append(np.array(list(indexs)))
     print("negative sample end,time:", time.time() - start)
     return negative_index
 
+
+def negetive_sample2(labels, ys, negative_num):
+    # 经试验，该方式得出的向量效果很差
+    # labels:[(频率，标签)]
+    start = time.time()
+
+    # 以万分之一为界限，低于万一的按一次算，其他的按照万一的整数倍算
+    word_indexs = []
+    for p, ind in labels:
+        n = max(int(p * 10000), 1)
+        word_indexs.extend([ind] * n)
+    random.shuffle(word_indexs)    # 随机所有标签后，依次获取可认为随机抽取标签
+    random_index = 0    # 当前抽取的起始位置
+    size = len(word_indexs)
+
+    def get_random_label(s):
+        # 获取random_index之后的s个标签，word_indexs是随机排序的，可以认为是随机获取标签
+        nonlocal random_index
+        if random_index >= size:
+            random_index = 0
+        random_index += s
+        return word_indexs[random_index-s:random_index]
+
+    len_y = len(ys[0])
+    if len(labels) < (1 + negative_num) * len_y:
+        print("负采样数量太多，标签太少，不够使用")
+        raise
+    num = negative_num * len_y
+
+    # 为每一条训练数据抽取负样本
+    negative_index = []
+    for y in ys:
+        indexs = set()
+        gap = num - len(indexs)
+        while gap > 0:
+            tem_labels = get_random_label(gap)    # 随机获取gap个标签
+            indexs.update(tem_labels)
+            indexs = indexs.difference(y)
+            gap = num - len(indexs)
+        negative_index.append(np.array(list(indexs)))
+    print("negative sample end,time:", time.time() - start)
+    # raise
+    return negative_index
 
 
 if __name__ == '__main__':

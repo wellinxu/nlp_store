@@ -48,6 +48,7 @@ trie.py  #trie树
 prefix_suffix_trie.py    #前后缀树
 double_array_trie.py  #双数组trie树
 acam.py  #ac自动机
+easy_trie.py   #trie树等几个实现合集
 ```
 ## read_source
 源码阅读        
